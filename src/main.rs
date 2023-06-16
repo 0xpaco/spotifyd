@@ -6,6 +6,7 @@ use color_eyre::{
     Help, SectionExt,
 };
 use daemonize::Daemonize;
+use fern::Output;
 use log::{error, info, trace, LevelFilter};
 use structopt::StructOpt;
 use tokio::runtime::Runtime;
@@ -49,10 +50,12 @@ fn setup_logger(log_target: LogTarget, verbose: bool) -> eyre::Result<()> {
                 process: "spotifyd".to_owned(),
                 pid: 0,
             };
-            logger.chain(
-                syslog::unix(log_format)
-                    .map_err(|e| eyre!("Couldn't connect to syslog instance: {}", e))?,
-            )
+            let dispatch: Output = if let Ok(syslog) = syslog::unix(log_format) {
+                syslog.into()
+            } else {
+                fern::log_file("/tmp/log/spotifyd.log")?.into()
+            };
+            logger.chain(dispatch)
         }
     };
 
